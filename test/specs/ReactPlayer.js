@@ -67,7 +67,15 @@ const TEST_URLS = [
     onSeek: true
   },
   {
-    name: 'FilePlayer (multiple sources)',
+    name: 'FilePlayer (multiple string sources)',
+    url: [
+      'http://clips.vorwaerts-gmbh.de/big_buck_bunny.mp4',
+      'http://clips.vorwaerts-gmbh.de/big_buck_bunny.ogv',
+      'http://clips.vorwaerts-gmbh.de/big_buck_bunny.webm'
+    ]
+  },
+  {
+    name: 'FilePlayer (multiple object sources)',
     url: [
       { src: 'http://clips.vorwaerts-gmbh.de/big_buck_bunny.mp4', type: 'video/mp4' },
       { src: 'http://clips.vorwaerts-gmbh.de/big_buck_bunny.ogv', type: 'video/ogv' },
@@ -102,6 +110,7 @@ describe('ReactPlayer', () => {
     desc(test.name, () => {
       it('canPlay', () => {
         expect(ReactPlayer.canPlay(test.url)).to.be.true
+        expect(ReactPlayer.canPlay('random-string')).to.be.false
       })
 
       it('onReady, onStart, onPlay, onDuration, onProgress', done => {
@@ -159,7 +168,7 @@ describe('ReactPlayer', () => {
           <ReactPlayer
             url={test.url}
             playing={false}
-            onReady={() => setTimeout(done, 3000)}
+            onReady={() => setTimeout(done, 1000)}
             onPlay={() => done('should not play if playing is false')}
           />,
         div)
@@ -182,6 +191,97 @@ describe('ReactPlayer', () => {
             onReady={() => setTimeout(playPlayer, 3000)}
           />,
         div)
+      })
+
+      it('volume change does not error', done => {
+        const changeVolume = () => {
+          render(
+            <ReactPlayer
+              url={test.url}
+              playing
+              volume={0.5}
+            />,
+          div)
+          setTimeout(done, 1000)
+        }
+        render(
+          <ReactPlayer
+            url={test.url}
+            playing
+            volume={1}
+            onProgress={p => {
+              if (p.playedSeconds >= 3) {
+                changeVolume()
+              }
+            }}
+          />,
+        div)
+      })
+
+      it('muted change does not error', done => {
+        const changeMuted = () => {
+          render(
+            <ReactPlayer
+              url={test.url}
+              playing
+              muted
+            />,
+          div)
+          setTimeout(done, 1000)
+        }
+        render(
+          <ReactPlayer
+            url={test.url}
+            playing
+            muted={false}
+            onProgress={p => {
+              if (p.playedSeconds >= 3) {
+                changeMuted()
+              }
+            }}
+          />,
+        div)
+      })
+
+      it('playbackRate change does not error', done => {
+        const changePlaybackRate = () => {
+          render(
+            <ReactPlayer
+              url={test.url}
+              playing
+              playbackRate={0.5}
+            />,
+          div)
+          setTimeout(done, 1000)
+        }
+        render(
+          <ReactPlayer
+            url={test.url}
+            playing
+            playbackRate={1}
+            onProgress={p => {
+              if (p.playedSeconds >= 3) {
+                changePlaybackRate()
+              }
+            }}
+          />,
+        div)
+      })
+
+      it('renders twice without error', done => {
+        let count = 0
+        const onReady = () => {
+          count++
+          if (count > 1) {
+            done('Should not call onReady more than once')
+          }
+        }
+        const renderPlayer = () => {
+          render(<ReactPlayer url={test.url} playing onReady={onReady} />, div)
+        }
+        renderPlayer()
+        setTimeout(renderPlayer, 1000)
+        setTimeout(done, 3000)
       })
 
       if (test.switchTo) {
@@ -369,6 +469,29 @@ describe('ReactPlayer', () => {
     })
   })
 
+  describe('fall back to FilePlayer', () => {
+    let player
+    beforeEach(done => {
+      render(
+        <ReactPlayer
+          ref={p => {
+            if (p) {
+              player = p
+              done()
+            }
+          }}
+          url='http://example.com/random/path'
+        />,
+      div)
+    })
+
+    it('falls back to FilePlayer', () => {
+      const video = player.getInternalPlayer()
+      expect(video).to.be.a('HTMLVideoElement')
+      expect(video.src).to.equal('http://example.com/random/path')
+    })
+  })
+
   describe('preloading', () => {
     let player
     beforeEach(done => {
@@ -398,6 +521,18 @@ describe('ReactPlayer', () => {
         expect(node.style.display).to.equal('none')
       }
     })
+  })
+
+  it('does not error when seeking using fraction before ready', () => {
+    render(
+      <ReactPlayer
+        ref={p => {
+          if (p) p.seekTo(0.5)
+        }}
+        url='http://clips.vorwaerts-gmbh.de/big_buck_bunny.mp4'
+        playing
+      />,
+    div)
   })
 
   it('canPlay returns false', () => {
